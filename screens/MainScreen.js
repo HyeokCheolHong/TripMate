@@ -104,15 +104,30 @@ export default function MainScreen({ navigation}) {
 
   // 관광지 저장 추가 및 저장 및 삭제 함수 추가
   const addToCart = async (spot) => {
+    console.log('🛒 현재 guestId:', guestId);
+
+    if (!guestId || !spot?.id) return;
+
+    // 위도, 경도 누락 시 보완
+    if (!spot.latitude || !spot.longitude) {
+      const enriched = (allSpots[region] || []).find((s) => s.id === spot.id);
+      if (enriched) {
+        spot = { ...spot, latitude: enriched.latitude, longitude: enriched.longitude };
+        console.log('📍 위경도 보완된 spot:', spot);
+      }
+    }
+
     const exists = cart.find((item) => item.id === spot.id);
     let newCart;
 
     if (exists) {
       // 삭제
       newCart = cart.filter((item) => item.id !== spot.id);
+      console.log(`🗑️ 삭제됨: ${spot.name}`);
     } else {
       // 추가
       newCart = [...cart, spot];
+      console.log(`✅ 저장됨: ${spot.name}`);
     }
 
     setCart(newCart);
@@ -122,21 +137,30 @@ export default function MainScreen({ navigation}) {
 
 
 
+
   // 접속하는 사용자마다 랜덤 GUEST번호 부여 및 저장된 관광지 불러오기
   useEffect(() => {
-    const id = 'GUEST-' + Math.floor(Math.random() * 100000);
-    setGuestId(id);
-
-    // 저장된 장바구니 불러오기 
-    const loadCart = async () => {
-      const saved = await AsyncStorage.getItem(`@cart-${id}`);
-      if (saved) {
-        setCart(JSON.parse(saved));
-      }
+    const initGuest = async () => {
+      const id = 'GUEST-' + Math.floor(Math.random() * 100000);
+      setGuestId(id);
+      await AsyncStorage.setItem('@guestId', id); // 반드시 저장
     };
 
-    loadCart();
+    initGuest().then(() => {
+      // ✅ guestId 세팅이 끝난 후에 장바구니 불러오기
+      const loadCart = async () => {
+        const id = await AsyncStorage.getItem('@guestId');
+        if (id) {
+          const saved = await AsyncStorage.getItem(`@cart-${id}`);
+          if (saved) {
+            setCart(JSON.parse(saved));
+          }
+        }
+      };
+      loadCart();
+    });
   }, []);
+
 
   return (
     <SafeAreaView style={styles.safeArea}>
